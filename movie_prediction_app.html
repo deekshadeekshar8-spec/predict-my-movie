@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Predict My Movie</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            position: relative;
+            z-index: 10;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 3.5rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            animation: glow 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes glow {
+            from { text-shadow: 0 4px 8px rgba(0,0,0,0.3); }
+            to { text-shadow: 0 4px 20px rgba(255,255,255,0.4); }
+        }
+
+        .subtitle {
+            font-size: 1.2rem;
+            opacity: 0.9;
+            margin-bottom: 30px;
+        }
+
+        .prediction-card {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 40px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+        }
+
+        .prediction-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        label {
+            display: block;
+            color: white;
+            font-weight: bold;
+            margin-bottom: 8px;
+            font-size: 1.1rem;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            font-size: 16px;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+        }
+
+        input::placeholder, textarea::placeholder {
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            background: rgba(255, 255, 255, 0.3);
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+            transform: scale(1.02);
+        }
+
+        .predict-btn {
+            width: 100%;
+            padding: 18px;
+            background: linear-gradient(45deg, #ff6b6b, #ffd93d);
+            border: none;
+            border-radius: 12px;
+            color: white;
+            font-size: 1.2rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .predict-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+            transition: left 0.5s;
+        }
+
+        .predict-btn:hover::before {
+            left: 100%;
+        }
+
+        .predict-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(255, 107, 107, 0.4);
+        }
+
+        .predict-btn:disabled {
+            background: rgba(255, 255, 255, 0.2);
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .results {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(15px);
+            border-radius: 15px;
+            padding: 30px;
+            margin-top: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            animation: slideIn 0.5s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .movie-card {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 15px 0;
+            transition: all 0.3s ease;
+            border-left: 4px solid #ffd93d;
+        }
+
+        .movie-card:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateX(10px);
+        }
+
+        .movie-title {
+            font-size: 1.4rem;
+            font-weight: bold;
+            color: white;
+            margin-bottom: 8px;
+        }
+
+        .movie-details {
+            color: rgba(255, 255, 255, 0.8);
+            line-height: 1.6;
+        }
+
+        .confidence-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            margin: 10px 0;
+            overflow: hidden;
+        }
+
+        .confidence-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff6b6b, #ffd93d);
+            border-radius: 4px;
+            transition: width 1s ease;
+        }
+
+        .loading {
+            text-align: center;
+            color: white;
+            font-size: 1.2rem;
+        }
+
+        .spinner {
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-top: 3px solid white;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        #background-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+        }
+
+        .genre-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .genre-tag {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            color: white;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+            
+            .header h1 {
+                font-size: 2.5rem;
+            }
+            
+            .prediction-card {
+                padding: 25px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="background-canvas"></canvas>
+    
+    <div class="container">
+        <div class="header">
+            <h1>🎬 Predict My Movie</h1>
+            <p class="subtitle">Tell us your preferences and we'll predict the perfect movies for you!</p>
+        </div>
+
+        <div class="prediction-card">
+            <form id="prediction-form">
+                <div class="form-group">
+                    <label for="favorite-genres">Favorite Genres (select multiple):</label>
+                    <select id="favorite-genres" multiple>
+                        <option value="action">Action</option>
+                        <option value="adventure">Adventure</option>
+                        <option value="animation">Animation</option>
+                        <option value="comedy">Comedy</option>
+                        <option value="crime">Crime</option>
+                        <option value="documentary">Documentary</option>
+                        <option value="drama">Drama</option>
+                        <option value="family">Family</option>
+                        <option value="fantasy">Fantasy</option>
+                        <option value="history">History</option>
+                        <option value="horror">Horror</option>
+                        <option value="music">Music</option>
+                        <option value="mystery">Mystery</option>
+                        <option value="romance">Romance</option>
+                        <option value="sci-fi">Science Fiction</option>
+                        <option value="thriller">Thriller</option>
+                        <option value="war">War</option>
+                        <option value="western">Western</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="mood">Current Mood:</label>
+                    <select id="mood">
+                        <option value="">Select your mood</option>
+                        <option value="happy">Happy & Upbeat</option>
+                        <option value="sad">Sad & Contemplative</option>
+                        <option value="excited">Excited & Energetic</option>
+                        <option value="relaxed">Relaxed & Chill</option>
+                        <option value="adventurous">Adventurous & Bold</option>
+                        <option value="romantic">Romantic & Dreamy</option>
+                        <option value="scary">Want to be Scared</option>
+                        <option value="thoughtful">Thoughtful & Intellectual</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="era-preference">Preferred Era:</label>
+                    <select id="era-preference">
+                        <option value="">No preference</option>
+                        <option value="classic">Classic (1940s-1960s)</option>
+                        <option value="retro">Retro (1970s-1990s)</option>
+                        <option value="modern">Modern (2000s-2010s)</option>
+                        <option value="recent">Recent (2020s)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="runtime">Preferred Runtime:</label>
+                    <select id="runtime">
+                        <option value="">No preference</option>
+                        <option value="short">Short (under 90 min)</option>
+                        <option value="medium">Medium (90-150 min)</option>
+                        <option value="long">Long (over 150 min)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="favorite-actors">Favorite Actors/Directors (optional):</label>
+                    <input type="text" id="favorite-actors" placeholder="e.g., Leonardo DiCaprio, Christopher Nolan">
+                </div>
+
+                <div class="form-group">
+                    <label for="avoid-genres">Genres to Avoid:</label>
+                    <input type="text" id="avoid-genres" placeholder="e.g., Horror, Documentary">
+                </div>
+
+                <button type="submit" class="predict-btn" id="predict-btn">
+                    🔮 Predict My Movies
+                </button>
+            </form>
+        </div>
+
+        <div id="results" class="results" style="display: none;">
+            <div id="loading" class="loading">
+                <div class="spinner"></div>
+                <p>Analyzing your preferences and finding perfect matches...</p>
+            </div>
+            <div id="predictions" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        // Mock movie database with detailed information
+        const movieDatabase = [
+            {
+                title: "The Dark Knight",
+                genres: ["action", "crime", "drama"],
+                year: 2008,
+                runtime: 152,
+                director: "Christopher Nolan",
+                actors: ["Christian Bale", "Heath Ledger", "Aaron Eckhart"],
+                mood: ["excited", "thoughtful"],
+                rating: 9.0,
+                description: "A psychological thriller about Batman's greatest challenge against the Joker."
+            },
+            {
+                title: "Inception",
+                genres: ["action", "sci-fi", "thriller"],
+                year: 2010,
+                runtime: 148,
+                director: "Christopher Nolan",
+                actors: ["Leonardo DiCaprio", "Marion Cotillard", "Tom Hardy"],
+                mood: ["excited", "thoughtful"],
+                rating: 8.8,
+                description: "A mind-bending heist that takes place within dreams."
+            },
+            {
+                title: "The Grand Budapest Hotel",
+                genres: ["adventure", "comedy", "crime"],
+                year: 2014,
+                runtime: 99,
+                director: "Wes Anderson",
+                actors: ["Ralph Fiennes", "F. Murray Abraham"],
+                mood: ["happy", "relaxed"],
+                rating: 8.1,
+                description: "A whimsical tale of a legendary concierge and his protégé."
+            },
+            {
+                title: "Parasite",
+                genres: ["comedy", "drama", "thriller"],
+                year: 2019,
+                runtime: 132,
+                director: "Bong Joon-ho",
+                actors: ["Song Kang-ho", "Lee Sun-kyun"],
+                mood: ["thoughtful", "excited"],
+                rating: 8.6,
+                description: "A dark comedy thriller about class conflict in modern society."
+            },
+            {
+                title: "La La Land",
+                genres: ["comedy", "drama", "music", "romance"],
+                year: 2016,
+                runtime: 128,
+                director: "Damien Chazelle",
+                actors: ["Ryan Gosling", "Emma Stone"],
+                mood: ["romantic", "happy"],
+                rating: 8.0,
+                description: "A musical romantic comedy-drama about love and dreams in Los Angeles."
+            },
+            {
+                title: "Get Out",
+                genres: ["horror", "mystery", "thriller"],
+                year: 2017,
+                runtime: 104,
+                director: "Jordan Peele",
+                actors: ["Daniel Kaluuya", "Allison Williams"],
+                mood: ["scary", "thoughtful"],
+                rating: 7.7,
+                description: "A psychological horror that tackles race relations in America."
+            },
+            {
+                title: "The Godfather",
+                genres: ["crime", "drama"],
+                year: 1972,
+                runtime: 175,
+                director: "Francis Ford Coppola",
+                actors: ["Marlon Brando", "Al Pacino"],
+                mood: ["thoughtful", "excited"],
+                rating: 9.2,
+                description: "The epic saga of a powerful crime family."
+            },
+            {
+                title: "Spirited Away",
+                genres: ["animation", "adventure", "family", "fantasy"],
+                year: 2001,
+                runtime: 125,
+                director: "Hayao Miyazaki",
+                actors: ["Rumi Hiiragi", "Miyu Irino"],
+                mood: ["adventurous", "happy"],
+                rating: 9.3,
+                description: "A young girl enters a world of spirits and magic."
+            },
+            {
+                title: "Pulp Fiction",
+                genres: ["crime", "drama"],
+                year: 1994,
+                runtime: 154,
+                director: "Quentin Tarantino",
+                actors: ["John Travolta", "Uma Thurman", "Samuel L. Jackson"],
+                mood: ["excited", "thoughtful"],
+                rating: 8.9,
+                description: "Interconnected criminal stories in Los Angeles."
+            },
+            {
+                title: "Her",
+                genres: ["drama", "romance", "sci-fi"],
+                year: 2013,
+                runtime: 126,
+                director: "Spike Jonze",
+                actors: ["Joaquin Phoenix", "Scarlett Johansson"],
+                mood: ["romantic", "thoughtful", "sad"],
+                rating: 8.0,
+                description: "A lonely man develops a relationship with an AI."
+            }
+        ];
+
+        // Advanced prediction algorithm
+        class MoviePredictor {
+            constructor(database) {
+                this.movies = database;
+            }
+
+            predict(preferences) {
+                const scores = this.movies.map(movie => ({
+                    movie,
+                    score: this.calculateScore(movie, preferences),
+                    reasons: this.getMatchReasons(movie, preferences)
+                }));
+
+                return scores
+                    .filter(item => item.score > 0.3)
+                    .sort((a, b) => b.score - a.score)
+                    .slice(0, 5);
+            }
+
+            calculateScore(movie, preferences) {
+                let score = 0;
+                let factors = 0;
+
+                // Genre matching (most important factor)
+                if (preferences.genres && preferences.genres.length > 0) {
+                    const genreMatch = preferences.genres.some(genre => 
+                        movie.genres.includes(genre));
+                    if (genreMatch) {
+                        score += 0.4;
+                        factors++;
+                    }
+                }
+
+                // Mood matching
+                if (preferences.mood && movie.mood.includes(preferences.mood)) {
+                    score += 0.3;
+                    factors++;
+                }
+
+                // Era preference
+                if (preferences.era) {
+                    const yearScore = this.getEraScore(movie.year, preferences.era);
+                    score += yearScore * 0.15;
+                    if (yearScore > 0) factors++;
+                }
+
+                // Runtime preference
+                if (preferences.runtime) {
+                    const runtimeScore = this.getRuntimeScore(movie.runtime, preferences.runtime);
+                    score += runtimeScore * 0.1;
+                    if (runtimeScore > 0) factors++;
+                }
+
+                // Actor/Director preference
+                if (preferences.actors) {
+                    const actorScore = this.getActorScore(movie, preferences.actors);
+                    score += actorScore * 0.2;
+                    if (actorScore > 0) factors++;
+                }
+
+                // Avoid genres penalty
+                if (preferences.avoidGenres) {
+                    const avoidPenalty = this.getAvoidGenresPenalty(movie, preferences.avoidGenres);
+                    score -= avoidPenalty;
+                }
+
+                // Rating boost
+                score += (movie.rating / 10) * 0.1;
+
+                return Math.min(score, 1.0);
+            }
+
+            getEraScore(year, era) {
+                switch (era) {
+                    case 'classic': return year >= 1940 && year <= 1969 ? 1 : 0;
+                    case 'retro': return year >= 1970 && year <= 1999 ? 1 : 0;
+                    case 'modern': return year >= 2000 && year <= 2019 ? 1 : 0;
+                    case 'recent': return year >= 2020 ? 1 : 0;
+                    default: return 0.5;
+                }
+            }
+
+            getRuntimeScore(runtime, preference) {
+                switch (preference) {
+                    case 'short': return runtime < 90 ? 1 : runtime < 120 ? 0.5 : 0;
+                    case 'medium': return runtime >= 90 && runtime <= 150 ? 1 : 0.3;
+                    case 'long': return runtime > 150 ? 1 : runtime > 120 ? 0.5 : 0;
+                    default: return 0.5;
+                }
+            }
+
+            getActorScore(movie, actorPrefs) {
+                const prefs = actorPrefs.toLowerCase().split(',').map(s => s.trim());
+                let score = 0;
+                
+                prefs.forEach(pref => {
+                    if (movie.director.toLowerCase().includes(pref)) score += 0.8;
+                    movie.actors.forEach(actor => {
+                        if (actor.toLowerCase().includes(pref)) score += 0.6;
+                    });
+                });
+
+                return Math.min(score, 1.0);
+            }
+
+            getAvoidGenresPenalty(movie, avoidGenres) {
+                const avoid = avoidGenres.toLowerCase().split(',').map(s => s.trim());
+                let penalty = 0;
+
+                avoid.forEach(genre => {
+                    if (movie.genres.some(g => g.toLowerCase().includes(genre))) {
+                        penalty += 0.8;
+                    }
+                });
+
+                return penalty;
+            }
+
+            getMatchReasons(movie, preferences) {
+                const reasons = [];
+                
+                if (preferences.genres?.some(g => movie.genres.includes(g))) {
+                    reasons.push(`Matches your favorite ${movie.genres.filter(g => preferences.genres.includes(g)).join(', ')} preferences`);
+                }
+                
+                if (preferences.mood && movie.mood.includes(preferences.mood)) {
+                    reasons.push(`Perfect for your current mood`);
+                }
+
+                if (preferences.actors) {
+                    const actorMatch = this.getActorScore(movie, preferences.actors) > 0;
+                    if (actorMatch) {
+                        reasons.push(`Features your preferred actors/directors`);
+                    }
+                }
+
+                if (movie.rating >= 8.5) {
+                    reasons.push(`Critically acclaimed (${movie.rating}/10)`);
+                }
+
+                return reasons;
+            }
+        }
+
+        // Initialize 3D background
+        function initBackground() {
+            const scene = new THREE.Scene();
+            const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('background-canvas'), alpha: true });
+            
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            
+            // Create floating particles
+            const geometry = new THREE.SphereGeometry(0.1, 8, 8);
+            const material = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6 });
+            
+            const particles = [];
+            for (let i = 0; i < 100; i++) {
+                const particle = new THREE.Mesh(geometry, material);
+                particle.position.set(
+                    (Math.random() - 0.5) * 20,
+                    (Math.random() - 0.5) * 20,
+                    (Math.random() - 0.5) * 20
+                );
+                particle.userData = {
+                    velocity: new THREE.Vector3(
+                        (Math.random() - 0.5) * 0.02,
+                        (Math.random() - 0.5) * 0.02,
+                        (Math.random() - 0.5) * 0.02
+                    )
+                };
+                particles.push(particle);
+                scene.add(particle);
+            }
+            
+            camera.position.z = 5;
+            
+            function animate() {
+                requestAnimationFrame(animate);
+                
+                particles.forEach(particle => {
+                    particle.position.add(particle.userData.velocity);
+                    
+                    if (Math.abs(particle.position.x) > 10) particle.userData.velocity.x *= -1;
+                    if (Math.abs(particle.position.y) > 10) particle.userData.velocity.y *= -1;
+                    if (Math.abs(particle.position.z) > 10) particle.userData.velocity.z *= -1;
+                    
+                    particle.rotation.x += 0.01;
+                    particle.rotation.y += 0.01;
+                });
+                
+                renderer.render(scene, camera);
+            }
+            
+            animate();
+            
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+        }
+
+        // Initialize the app
+        const predictor = new MoviePredictor(movieDatabase);
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            initBackground();
+            
+            const form = document.getElementById('prediction-form');
+            const resultsDiv = document.getElementById('results');
+            const loadingDiv = document.getElementById('loading');
+            const predictionsDiv = document.getElementById('predictions');
+            
+            form.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                
+                // Show results section with loading
+                resultsDiv.style.display = 'block';
+                loadingDiv.style.display = 'block';
+                predictionsDiv.style.display = 'none';
+                
+                // Collect form data
+                const formData = new FormData(form);
+                const genreSelect = document.getElementById('favorite-genres');
+                const selectedGenres = Array.from(genreSelect.selectedOptions).map(option => option.value);
+                
+                const preferences = {
+                    genres: selectedGenres,
+                    mood: document.getElementById('mood').value,
+                    era: document.getElementById('era-preference').value,
+                    runtime: document.getElementById('runtime').value,
+                    actors: document.getElementById('favorite-actors').value,
+                    avoidGenres: document.getElementById('avoid-genres').value
+                };
+                
+                // Simulate API call delay
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                // Get predictions
+                const predictions = predictor.predict(preferences);
+                
+                // Hide loading and show results
+                loadingDiv.style.display = 'none';
+                predictionsDiv.style.display = 'block';
+                
+                // Display results
+                displayPredictions(predictions);
+            });
+        });
+
+        function displayPredictions(predictions) {
+            const predictionsDiv = document.getElementById('predictions');
+            
+            if (predictions.length === 0) {
+                predictionsDiv.innerHTML = `
+                    <div class="movie-card">
+                        <div class="movie-title">No matches found</div>
+                        <div class="movie-details">Try adjusting your preferences or selecting different genres.</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            predictionsDiv.innerHTML = `
+                <h2 style="color: white; margin-bottom: 20px; text-align: center;">
+                    🎯 Your Perfect Movie Matches
+                </h2>
+                ${predictions.map((prediction, index) => {
+                    const movie = prediction.movie;
+                    const confidence = Math.round(prediction.score * 100);
+                    
+                    return `
+                        <div class="movie-card">
+                            <div class="movie-title">
+                                #${index + 1} ${movie.title} (${movie.year})
+                            </div>
+                            <div class="confidence-bar">
+                                <div class="confidence-fill" style="width: ${confidence}%"></div>
+                            </div>
+                            <div style="color: white; font-size: 0.9rem; margin-bottom: 10px;">
+                                Match Confidence: ${confidence}%
+                            </div>
+                            <div class="movie-details">
+                                <strong>Director:</strong> ${movie.director}<br>
+                                <strong>Runtime:</strong> ${movie.runtime} minutes<br>
+                                <strong>Rating:</strong> ${movie.rating}/10<br>
+                                <strong>Plot:</strong> ${movie.description}
+                            </div>
+                            <div class="genre-tags">
+                                ${movie.genres.map(genre => `<span class="genre-tag">${genre}</span>`).join('')}
+                            </div>
+                            ${prediction.reasons.length > 0 ? `
+                                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.2);">
+                                    <strong style="color: #ffd93d;">Why this matches:</strong>
+                                    <ul style="margin-top: 5px; color: rgba(255,255,255,0.9);">
+                                        ${prediction.reasons.map(reason => `<li>${reason}</li>`).join('')}
+                                    </ul>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                }).join('')}
+                
+                <div style="text-align: center; margin-top: 30px; padding: 20px; background: rgba(255,255,255,0.1); border-radius: 10px;">
+                    <h3 style="color: white; margin-bottom: 10px;">🎬 Ready to Watch?</h3>
+                    <p style="color: rgba(255,255,255,0.8);">
+                        These predictions are based on your preferences and our movie database. 
+                        Check your favorite streaming platforms or local theaters!
+                    </p>
+                </div>
+            `;
+            
+            // Animate confidence bars
+            setTimeout(() => {
+                document.querySelectorAll('.confidence-fill').forEach(bar => {
+                    const width = bar.style.width;
+                    bar.style.width = '0%';
+                    setTimeout(() => bar.style.width = width, 100);
+                });
+            }, 100);
+        }
+    </script>
+</body>
+</html>
